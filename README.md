@@ -112,3 +112,103 @@ Expected response:
 ```json
 {"status":"healthy"}
 ```
+
+## Design Decisions
+
+### 1. In-Memory Storage
+
+**Decision**: Use in-memory storage with mutex-based concurrency control.
+
+**Rationale**:
+- Fast read/write operations
+- Simple deployment (no external dependencies)
+- Thread-safe with `sync.RWMutex`, to avoid racing conditions on read/update/delete events
+- Suitable for the rapid prototyping/small-scale research project
+
+**Trade-offs**:
+- Data is not persistent, wiped out once the apps are restarted/shutdown
+- Limited by available memory, can overflow'ed your pc memory
+
+### 2. Immutable Version History
+
+**Decision**: Store complete configuration data for each version.
+
+**Rationale**:
+- Simple yet straightforward rollback implementation
+- Complete audit trail, we can record who/when/what when the version changed.
+- No need to replay changes
+- Fast version retrieval
+
+**Trade-offs**:
+- Higher memory usage for large configs
+
+### 3. Layered Architecture
+
+**Decision**: Follow common pattern, separate concerns into distinct layers (handlers → service → repository).
+
+**Rationale**:
+- Clear separation of main functions, ie similar to domain segregation.
+
+### 4. JSON Schema Validation
+
+**Decision**: Use `gojsonschema` library for validation.
+
+**Rationale**:
+- Industry standard (JSON Schema specification)
+- Flexible and extensible
+- Rich validation capabilities
+- Adequate error message handling
+
+### 5. Graceful Shutdown
+
+**Decision**: Implement graceful shutdown with timeout.
+
+**Rationale**:
+- Production-ready behaviour ensures clean resource cleanup, completion of in-flight requests, and prevention of data corruption.
+
+### 6. Thread Safety
+
+**Decision**: Use `sync.RWMutex` for concurrent access control.
+
+**Rationale**:
+- Production-ready for multi-user environments
+- Read-optimized (multiple concurrent reads)
+- Write-safe (exclusive write locks)
+- No race conditions
+
+
+## Project Structure
+
+```
+config-engine/
+├── api.yml                 # OpenAPI v3 specification
+├── main.go                 # Application entry point
+├── go.mod                  # Go module definition
+├── Makefile                # Build and test automation
+├── README.md               # This file
+├── internal/               # Internal packages
+│   ├── models/             # Domain models and DTOs
+│   │   └── config.go
+│   ├── repository/         # Data storage layer
+│   │   ├── repository.go
+│   │   └── repository_test.go
+│   ├── service/            # Business logic layer
+│   │   ├── service.go
+│   │   └── service_test.go
+│   ├── validation/         # Schema validation
+│   │   ├── validator.go
+│   │   └── validator_test.go
+│   └── handlers/           # HTTP handlers
+│       └── handlers.go
+└── tests/                  # Integration tests
+    └── integration_test.go
+```
+
+### Package Descriptions
+
+- **`internal/models`**: Core domain entities, request/response structures, and custom errors
+- **`internal/repository`**: Thread-safe in-memory storage with versioning support
+- **`internal/service`**: Business logic, validation orchestration, and use case implementations
+- **`internal/validation`**: JSON Schema validation with extensible schema registry
+- **`internal/handlers`**: HTTP request/response handling, routing, and middleware
+- **`tests`**: End-to-end integration tests
